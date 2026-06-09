@@ -92,7 +92,9 @@ Tested against [EVTX-ATTACK-SAMPLES](https://github.com/sbousseaden/EVTX-ATTACK-
 - IP and account extraction is regex-based against observed EventData formats; new log sources may require field-mapping adjustments.
 
 These are documented deliberately — knowing where a detector is weak is part of trustworthy incident response.
+## Note on execution logs and token usage
 
+The execution log (`output/execution_log.jsonl`) records each tool invocation with a UTC timestamp, the exact command, return code, and full stdout/stderr — so any finding traces back to the specific tool run that produced it. Token-usage figures are intentionally absent: the detection and verification tools are **deterministic Python**, not LLM calls, so they consume no tokens. Placing the analytical logic in deterministic, auditable code (rather than in-model reasoning) is a deliberate trust decision — it makes every finding reproducible and independently verifiable, with no model nondeterminism in the evidence path.
 ## License
 
 MIT — see [LICENSE](LICENSE).
