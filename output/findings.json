@@ -1,0 +1,37 @@
+[
+  {
+    "type": "brute_force_suspected",
+    "source_ip": "10.0.2.17",
+    "failed_attempts": 10,
+    "threshold": 5,
+    "computer": "MSEDGEWIN10",
+    "accounts_targeted": [
+      "##MS_AgentSigningCertificate##",
+      "##MS_PolicyEventProcessingLogin##",
+      "##MS_PolicySigningCertificate##",
+      "##MS_PolicyTsqlExecutionLogin##",
+      "##MS_SQLAuthenticatorCertificate##",
+      "##MS_SQLReplicationSigningCertificate##",
+      "##MS_SQLResourceSigningCertificate##",
+      "##MS_SmoExtendedSigningCertificate##",
+      "root",
+      "sa"
+    ],
+    "first_seen": "2019-11-04 13:46:01.171339+00:00",
+    "last_seen": "2019-11-04 13:46:01.279825+00:00",
+    "evidence_record_ids": [
+      "13026",
+      "13027",
+      "13028",
+      "13029",
+      "13030",
+      "13031",
+      "13032",
+      "13033",
+      "13034",
+      "13035"
+    ],
+    "source_file": "MSSQL_multiple_failed_logon_EventID_18456.evtx",
+    "verified": false
+  }
+]
