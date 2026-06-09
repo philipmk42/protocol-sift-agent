@@ -15,35 +15,24 @@ The intelligence lives in the *verification layer*, not buried inside the detect
 
 ## Self-correction in action
 
-Run against `MSSQL_multiple_failed_logon_EventID_18456.evtx`, the pipeline does this:# protocol-sift-agent
-Self-correcting autonomous DFIR agent for Windows Event Log triage — SANS FIND EVIL! hackathon
+Run against `MSSQL_multiple_failed_logon_EventID_18456.evtx`, the pipeline produces:
+
+```
 10.0.2.17: naive=10 real=2 noise=8 => FALSE_POSITIVE
 Naive detector counted 10 failed events. Verification identified 2 genuine
 credential failure(s) and filtered 8 system/service-noise event(s).
 Finding RETRACTED as false positive (real failures 2 < threshold 5).
+```
 
 The naive detector sees 10 failed logons from one IP and flags brute force. The verifier re-reads all 10 records, recognizes that 8 are SQL Server internal certificate accounts (`##MS_...`, "Attempting to use an NT account name") rather than real password attempts, and **autonomously retracts the finding**. Every number traces back to specific event record IDs.
 
 ## Architecture
 
-.evtx file
-│
-▼
-parse_evtx.py        →  normalizes raw events to JSONL.
-(uses SIFT's            Each record keeps source_file +
-evtx_dump.py)          EventRecordID for full traceability.
-│
-▼
-detect_bruteforce.py →  NAIVE, high-recall first pass.
-Counts all failures per source IP.
-│
-▼
-verify_finding.py    →  Independent re-examination.
-Separates real failures from noise,
-corrects or retracts the verdict.
-│
-▼
-verified_findings.json  →  traceable, self-corrected output.
+**Pattern: Direct Agent Extension** (Claude Code on the SIFT Workstation drives a pipeline of purpose-built tools).
+
+![Architecture diagram](docs/architecture.png)
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full diagram and a breakdown of architectural vs. prompt-based trust boundaries.
 
 **Trust boundary:** evidence files are treated as read-only; the pipeline only ever reads `.evtx` input and writes to a separate `output/` directory. No tool modifies original evidence.
 
@@ -58,6 +47,14 @@ cd protocol-sift-agent
 # Get the sample evidence (Windows Event Log attack samples)
 git clone https://github.com/sbousseaden/EVTX-ATTACK-SAMPLES.git ~/evtx-samples
 
+# Run the full pipeline (parse -> detect -> verify) with execution logging
+python3 run_investigation.py \
+  ~/evtx-samples/"Credential Access"/MSSQL_multiple_failed_logon_EventID_18456.evtx 5
+```
+
+Or run each stage individually:
+
+```bash
 # 1. Parse a .evtx file into structured JSONL
 python3 tools/parse_evtx.py \
   ~/evtx-samples/"Credential Access"/MSSQL_multiple_failed_logon_EventID_18456.evtx \
@@ -72,18 +69,26 @@ python3 tools/verify_finding.py output/findings.json output/mssql_parsed.jsonl o
 
 ## Project structure
 
+```
 protocol-sift-agent/
+├── run_investigation.py      # orchestrator: runs full pipeline + execution log
 ├── tools/
-│   ├── parse_evtx.py         # .evtx → structured JSONL (traceable records)
+│   ├── parse_evtx.py         # .evtx -> structured JSONL (traceable records)
 │   ├── detect_bruteforce.py  # naive high-recall detector
 │   └── verify_finding.py     # independent verifier + self-correction
-├── output/                   # generated findings (sample run included)
+├── docs/
+│   ├── ARCHITECTURE.md       # architecture + trust boundaries
+│   ├── architecture.png      # architecture diagram
+│   ├── ACCURACY_REPORT.md    # self-assessment + evidence integrity
+│   └── DATASET.md            # dataset source + reproducibility
+├── output/                   # generated findings + execution log
 ├── LICENSE                   # MIT
 └── README.md
+```
 
 ## Dataset
 
-Tested against [EVTX-ATTACK-SAMPLES](https://github.com/sbousseaden/EVTX-ATTACK-SAMPLES), an open collection of real Windows Event Log samples mapped to MITRE ATT&CK techniques. Each file is a labeled mini-case with known ground truth, which makes accuracy self-assessment honest and reproducible.
+Tested against [EVTX-ATTACK-SAMPLES](https://github.com/sbousseaden/EVTX-ATTACK-SAMPLES), an open collection of real Windows Event Log samples mapped to MITRE ATT&CK techniques. Each file is a labeled mini-case with known ground truth, which makes accuracy self-assessment honest and reproducible. See [docs/DATASET.md](docs/DATASET.md).
 
 ## Limitations & honesty
 
@@ -91,10 +96,12 @@ Tested against [EVTX-ATTACK-SAMPLES](https://github.com/sbousseaden/EVTX-ATTACK-
 - The noise/real classification is rule-based (keyword and account-prefix matching tuned to observed samples). It is transparent and auditable, but would need broadened rules for production log diversity.
 - IP and account extraction is regex-based against observed EventData formats; new log sources may require field-mapping adjustments.
 
-These are documented deliberately — knowing where a detector is weak is part of trustworthy incident response.
+These are documented deliberately — knowing where a detector is weak is part of trustworthy incident response. Full self-assessment in [docs/ACCURACY_REPORT.md](docs/ACCURACY_REPORT.md).
+
 ## Note on execution logs and token usage
 
 The execution log (`output/execution_log.jsonl`) records each tool invocation with a UTC timestamp, the exact command, return code, and full stdout/stderr — so any finding traces back to the specific tool run that produced it. Token-usage figures are intentionally absent: the detection and verification tools are **deterministic Python**, not LLM calls, so they consume no tokens. Placing the analytical logic in deterministic, auditable code (rather than in-model reasoning) is a deliberate trust decision — it makes every finding reproducible and independently verifiable, with no model nondeterminism in the evidence path.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
